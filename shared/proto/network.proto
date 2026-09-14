@@ -1,0 +1,154 @@
+syntax = "proto3";
+
+// ============================================================================
+// IPC contract: WindowsClient (WinUI 3) <-> network-service (Rust)
+// Transport: Named Pipe \\.\pipe\NetworkClient, frames = u32-LE length prefix
+// + one protobuf message (Request | Response | Event).
+//
+// Complex domain objects (Node / Rule / Subscription / DNS config) are
+// carried as JSON UTF-8 inside TextPayload.text so that the data-plane model
+// can evolve without regenerating IPC code. The method table documents the
+// payload shape for every method.
+//
+// Method table (request payload -> response payload):
+//   system.getVersion            Empty            -> VersionPayload
+//   connection.getStatus         Empty            -> ConnectionStatePayload
+//   connection.connect           ConnectRequest   -> ConnectionStatePayload
+//   connection.disconnect        Empty            -> ConnectionStatePayload
+//   connection.reconnect         ConnectRequest   -> ConnectionStatePayload
+//   node.list                    Empty            -> TextPayload (Vec<Node> JSON)
+//   node.get                     TextPayload(id)  -> TextPayload (Node JSON)
+//   node.add / node.update       TextPayload(Node JSON) -> TextPayload(Node JSON)
+//   node.delete                  TextPayload(id)  -> Empty
+//   node.select                  TextPayload(id)  -> Empty
+//   node.test                    TextPayload(id)  -> TextPayload(NodeRuntimeStats JSON)
+//   node.batchTest               Empty            -> TextPayload(map id->stats JSON)
+//   subscription.list            Empty            -> TextPayload(Vec<Subscription> JSON)
+//   subscription.add             TextPayload(Subscription JSON) -> TextPayload
+//   subscription.update          TextPayload(Subscription JSON) -> Empty
+//   subscription.delete          TextPayload(id)  -> Empty
+//   subscription.refresh         TextPayload(id)  -> Empty (async; event follows)
+//   routing.getConfig            Empty            -> TextPayload(RoutingConfig JSON)
+//   routing.setMode              TextPayload(JSON {"mode":"smart"}) -> TextPayload
+//   routing.listRules            Empty            -> TextPayload(Vec<Rule> JSON)
+//   routing.addRule/updateRule   TextPayload(Rule JSON) -> TextPayload
+//   routing.deleteRule           TextPayload(id)  -> Empty
+//   dns.getConfig                Empty            -> TextPayload(DnsConfig JSON)
+//   dns.setConfig                TextPayload(DnsConfig JSON) -> TextPayload
+//   dns.test                     TextPayload(JSON {"domain":""}?) -> TextPayload
+//   dns.flushCache               Empty            -> Empty
+//   statistics.get               Empty            -> TrafficPayload
+//   statistics.getToday          Empty            -> TrafficPayload
+//   diagnostics.run              Empty            -> TextPayload(Report JSON; progress events)
+//   diagnostics.ping             TextPayload(JSON {"host":"","port":443}) -> TextPayload
+//   diagnostics.dns              Empty            -> TextPayload
+//   diagnostics.proxy            Empty            -> TextPayload
+//   diagnostics.speed            TextPayload(JSON {"url":""}) -> TextPayload
+//   diagnostics.packetLoss       Empty            -> TextPayload
+// ============================================================================
+
+package networkclient.v1;
+
+// ----- Envelope -------------------------------------------------------------
+
+message Request {
+  string request_id = 1;
+  string method = 2;
+  bytes payload = 3;
+  uint32 protocol_version = 4; // IPC protocol major version, currently 1
+}
+
+message Response {
+  string request_id = 1;
+  int32 code = 2;    // 0 = OK, otherwise see common::ErrorCode
+  string message = 3;
+  bytes payload = 4;
+}
+
+message Event {
+  string event_type = 1;
+  bytes payload = 2;
+  int64 timestamp = 3; // unix millis
+}
+
+// ----- Common payloads ------------------------------------------------------
+
+message Empty {}
+
+message TextPayload {
+  string text = 1;
+}
+
+message VersionPayload {
+  uint32 protocol_version = 1;
+  string service_version = 2;
+  string core_version = 3;
+}
+
+message ConnectRequest {
+  string node_id = 1;
+  string mode = 2; // "global" | "smart" | "direct"
+}
+
+message ConnectionStatePayload {
+  string state = 1;       // STOPPED|INITIALIZING|READY|STARTING|CONNECTING|
+                          // CONNECTED|RECONNECTING|STOPPING|ERROR
+  string node_id = 2;
+  string node_name = 3;
+  string mode = 4;
+  int64 latency_ms = 5;
+  string error_code = 6;
+  string error_message = 7;
+  int64 timestamp = 8;
+}
+
+message TrafficPayload {
+  uint64 up_rate = 1;        // bytes / second (session window)
+  uint64 down_rate = 2;
+  uint64 up_total = 3;       // session bytes
+  uint64 down_total = 4;
+  uint64 up_today = 5;       // aggregated day bytes
+  uint64 down_today = 6;
+}
+
+message NodeStatsPayload {
+  string node_id = 1;
+  int64 latency_ms = 2;
+  double packet_loss = 3;
+  uint64 download_speed = 4;
+  uint64 upload_speed = 5;
+  double availability = 6;
+  double score = 7;
+  int64 last_test = 8;
+  uint64 success_count = 9;
+  uint64 failure_count = 10;
+}
+
+message SubscriptionEventPayload {
+  string subscription_id = 1;
+  string name = 2;
+  string error = 3;
+  uint32 node_count = 4;
+}
+
+message DiagnosticProgressPayload {
+  string step = 1;
+  uint32 index = 2;
+  uint32 total = 3;
+  string status = 4; // running|ok|warn|fail
+  string detail = 5;
+}
+
+// ----- Event payload mapping ------------------------------------------------
+// connection.stateChanged -> ConnectionStatePayload
+// traffic.updated         -> TrafficPayload
+// node.latencyChanged     -> NodeStatsPayload
+// node.healthChanged      -> NodeStatsPayload
+// subscription.updated    -> SubscriptionEventPayload
+// subscription.failed     -> SubscriptionEventPayload
+// diagnostics.progress    -> DiagnosticProgressPayload
+// diagnostics.completed   -> TextPayload (Report JSON)
+// network.changed         -> TextPayload
+// dns.changed             -> TextPayload
+// core.started/stopped    -> Empty
+// core.error              -> TextPayload

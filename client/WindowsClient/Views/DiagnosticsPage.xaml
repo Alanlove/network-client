@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WindowsClient.Views.DiagnosticsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid Padding="28" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题 + 按钮 -->
+        <Grid Grid.Row="0">
+            <TextBlock Text="网络诊断" FontSize="22"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <ProgressRing IsActive="{x:Bind Vm.Busy, Mode=OneWay}" Width="20" Height="20"/>
+                <Button Content="一键修复" Command="{x:Bind Vm.RepairCommand}"
+                        ToolTipService.ToolTip="断开连接 → 清理系统代理 → 刷新 DNS → 重连"/>
+                <Button Content="开始诊断" Style="{ThemeResource AccentButtonStyle}"
+                        Command="{x:Bind Vm.RunCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- 状态信息 -->
+        <StackPanel Grid.Row="1" Spacing="4">
+            <TextBlock Text="{x:Bind Vm.Summary, Mode=OneWay}"
+                       Foreground="{ThemeResource SystemFillColorSuccessBrush}"/>
+            <TextBlock Text="{x:Bind Vm.Message, Mode=OneWay}"
+                       Foreground="{ThemeResource SystemFillColorCriticalBrush}"/>
+        </StackPanel>
+
+        <!-- 诊断结果列表 -->
+        <ItemsControl Grid.Row="2" ItemsSource="{x:Bind Vm.Items}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:DiagLine" xmlns:vm="using:WindowsClient.ViewModels">
+                    <Border Style="{ThemeResource CardBorderFilledStyle}" Margin="0,0,0,10" Padding="16">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="140"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <FontIcon Grid.Column="0" Glyph="{x:Bind Glyph, Mode=OneWay}" FontSize="18"
+                                      VerticalAlignment="Top"/>
+                            <TextBlock Grid.Column="1" Text="{x:Bind Title}"
+                                       Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                            <TextBlock Grid.Column="2" Text="{x:Bind Status, Mode=OneWay}"/>
+                            <TextBlock Grid.Column="3" Text="{x:Bind Detail, Mode=OneWay}"
+                                       TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- 日志区域（Expander 折叠，默认不占空间） -->
+        <Expander Grid.Row="3" Header="服务日志" IsExpanded="False" Margin="0,8,0,0">
+            <Grid RowSpacing="10">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="260"/>
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                    <Button Content="刷新日志" Command="{x:Bind Vm.LoadLogsCommand}" Size="Small"/>
+                    <CheckBox Content="自动滚动到底部" IsChecked="{x:Bind Vm.AutoScroll, Mode=TwoWay}"/>
+                </StackPanel>
+                <Border Grid.Row="1" Padding="8" Background="{ThemeResource ControlOnImageFillBrush}">
+                    <ScrollViewer x:Name="LogScroller" VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="LogText" Text="{x:Bind Vm.LogText, Mode=OneWay}"
+                                   FontFamily="Cascadia Mono, Consolas" FontSize="12"
+                                   TextWrapping="NoWrap"/>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+        </Expander>
+    </Grid>
+</Page>

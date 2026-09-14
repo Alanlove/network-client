@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="WindowsClient.Views.SettingsPage"
+    x:Name="PageRoot"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer>
+        <StackPanel Padding="28" Spacing="18" MaxWidth="760">
+
+            <TextBlock Text="设置" FontSize="22"/>
+
+            <Border Style="{ThemeResource CardBorderFilledStyle}" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="版本信息" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                    <TextBlock Text="{x:Bind Vm.VersionText, Mode=OneWay}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{ThemeResource CardBorderFilledStyle}" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="外观" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <RadioButton Content="跟随系统" GroupName="Theme"
+                                     Tag="System" Click="Theme_Click"
+                                     IsChecked="{x:Bind Vm.IsThemeSystem, Mode=OneWay}"/>
+                        <RadioButton Content="浅色" GroupName="Theme"
+                                     Tag="Light" Click="Theme_Click"
+                                     IsChecked="{x:Bind Vm.IsThemeLight, Mode=OneWay}"/>
+                        <RadioButton Content="深色" GroupName="Theme"
+                                     Tag="Dark" Click="Theme_Click"
+                                     IsChecked="{x:Bind Vm.IsThemeDark, Mode=OneWay}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{ThemeResource CardBorderFilledStyle}" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="添加订阅" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                    <TextBox Header="名称" PlaceholderText="我的机场"
+                             Text="{x:Bind Vm.NewName, Mode=TwoWay}"/>
+                    <TextBox Header="订阅地址" PlaceholderText="https://example.com/sub"
+                             Text="{x:Bind Vm.NewUrl, Mode=TwoWay}"/>
+                    <Button Content="添加并同步" HorizontalAlignment="Left"
+                            Style="{ThemeResource AccentButtonStyle}"
+                            Command="{x:Bind Vm.AddSubscriptionCommand}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{ThemeResource CardBorderFilledStyle}" Padding="20">
+                <StackPanel Spacing="10">
+                    <Grid>
+                        <TextBlock Text="我的订阅" Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                        <Button Content="刷新列表" HorizontalAlignment="Right"
+                                Command="{x:Bind Vm.LoadSubscriptionsCommand}"/>
+                    </Grid>
+                    <TextBlock Text="{x:Bind Vm.Message, Mode=OneWay}"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                    <ItemsControl ItemsSource="{x:Bind Vm.Subscriptions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="mdl:SubscriptionView"
+                                          xmlns:mdl="using:WindowsClient.Models">
+                                <Grid Padding="0,8" ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{x:Bind Name}"
+                                                   Style="{ThemeResource BodyStrongTextBlockStyle}"/>
+                                        <TextBlock Text="{x:Bind Url}" FontSize="12"
+                                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                               Text="{x:Bind NodeCount}" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                    <Button Grid.Column="2" Content="立即刷新"
+                                            Command="{Binding Vm.RefreshCommand, ElementName=PageRoot}"
+                                            CommandParameter="{x:Bind}"/>
+                                    <Button Grid.Column="3" Content="删除"
+                                            Command="{Binding Vm.DeleteCommand, ElementName=PageRoot}"
+                                            CommandParameter="{x:Bind}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>
