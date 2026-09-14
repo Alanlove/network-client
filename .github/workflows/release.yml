@@ -1,0 +1,125 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v0.1.0)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (Windows x64)
+    runs-on: windows-2022
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '9.0.x'
+
+    - name: Setup Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-pc-windows-msvc
+
+    - name: Restore .NET dependencies
+      run: dotnet restore client/WindowsClient/WindowsClient.csproj
+
+    - name: Build Rust service (Release)
+      run: cargo build --release --manifest-path service/network-service/Cargo.toml
+
+    - name: Publish .NET client (self-contained)
+      run: |
+        dotnet publish client/WindowsClient/WindowsClient.csproj `
+          -c Release -p:Platform=x64 `
+          -r win-x64 --self-contained true `
+          -o artifacts/client
+
+    - name: Download Xray core
+      run: |
+        $xrayVer = "1.8.24"
+        $url = "https://github.com/XTLS/Xray-core/releases/download/v$xrayVer/Xray-windows-64.zip"
+        Invoke-WebRequest -Uri $url -OutFile xray.zip
+        Expand-Archive -Path xray.zip -DestinationPath xray -Force
+        # 找 xray.exe
+        $xray = Get-ChildItem xray -Recurse -Filter "xray.exe" | Select-Object -First 1
+        Copy-Item $xray.FullPath artifacts/client/bindings/xray.exe -Force
+        Write-Host "Xray v$xrayVer downloaded: $($xray.FullName)"
+
+    - name: Assemble release package
+      run: |
+        $pkg = "artifacts/package"
+        New-Item -ItemType Directory -Path "$pkg\bin" -Force | Out-Null
+        New-Item -ItemType Directory -Path "$pkg\config" -Force | Out-Null
+        New-Item -ItemType Directory -Path "$pkg\logs" -Force | Out-Null
+        New-Item -ItemType Directory -Path "$pkg\cache\geoip" -Force | Out-Null
+
+        # Rust service
+        Copy-Item "service\network-service\target\release\network-service.exe" "$pkg\bin\" -Force
+
+        # .NET client 全部
+        Copy-Item "artifacts\client\*" "$pkg\" -Recurse -Force
+
+        # 启动脚本
+        @"
+        @echo off
+        set NC_DATA_DIR=%~dp0
+        start "" "bin\WindowsClient.exe"
+        "@ | Out-File -FilePath "$pkg\start.cmd" -Encoding ASCII
+
+        # 版本文件
+        $tag = if ($env:GITHUB_REF_NAME) { $env:GITHUB_REF_NAME } else { "manual-build" }
+        "version=$tag" | Out-File -FilePath "$pkg\VERSION.txt" -Encoding ASCII
+
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: network-client-x64
+        path: artifacts/package
+        retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name != '')
+
+    steps:
+    - name: Download package
+      uses: actions/download-artifact@v4
+      with:
+        name: network-client-x64
+        path: release-package
+
+    - name: Create zip
+      run: |
+        cd release-package
+        zip -r ../network-client-x64.zip .
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: ${{ github.ref_name || github.event.inputs.tag_name }}
+        name: Network Client ${{ github.ref_name || github.event.inputs.tag_name }}
+        body: |
+          ## Network Client Windows x64
+          
+          - Rust service + WinUI 3 客户端
+          - 已包含 Xray 内核
+          - 解压到任意目录，运行 `start.cmd` 启动
+          
+          **首次运行会自动创建 `data/` 目录结构**，订阅 URL 请在设置页添加。
+          
+          > 系统代理自动设置/还原，TUN 模式需要管理员权限。
+        files: network-client-x64.zip

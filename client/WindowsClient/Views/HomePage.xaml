@@ -25,7 +25,7 @@
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
-                                    </Ellipse>
+                                    </Ellipse.Style>
                                 </Ellipse>
                                 <TextBlock Text="{x:Bind Vm.StateText, Mode=OneWay}" FontSize="22" FontWeight="SemiBold"/>
                                 <ProgressRing IsActive="{x:Bind Vm.Busy, Mode=OneWay}"
