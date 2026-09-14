@@ -16,12 +16,20 @@
             <TextBlock Text="节点管理" FontSize="22"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                 <ProgressRing IsActive="{x:Bind Vm.Busy, Mode=OneWay}" Width="20" Height="20"/>
-                <Button Content="刷新订阅" Command="{x:Bind Vm.LoadCommand}">
-                    <Button.Icon><FontIcon Glyph="&#xE72C;"/></Button.Icon>
+                <Button Command="{x:Bind Vm.LoadCommand}"
+                        ToolTipService.ToolTip="刷新订阅节点列表">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE72C;"/>
+                        <TextBlock Text="刷新订阅"/>
+                    </StackPanel>
                 </Button>
-                <Button Content="全部测速" Style="{ThemeResource AccentButtonStyle}"
-                        Command="{x:Bind Vm.BatchTestCommand}">
-                    <Button.Icon><FontIcon Glyph="&#xE9D9;"/></Button.Icon>
+                <Button Style="{ThemeResource AccentButtonStyle}"
+                        Command="{x:Bind Vm.BatchTestCommand}"
+                        ToolTipService.ToolTip="对所有节点进行延迟测试">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE9D9;"/>
+                        <TextBlock Text="全部测速"/>
+                    </StackPanel>
                 </Button>
             </StackPanel>
         </Grid>
@@ -56,12 +64,14 @@
                                        FontWeight="SemiBold"/>
                             <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                 <Button Command="{Binding Vm.SelectCommand, ElementName=PageRoot}"
-                                        CommandParameter="{x:Bind}" ToolTip="使用此节点"
+                                        CommandParameter="{x:Bind}"
+                                        ToolTipService.ToolTip="使用此节点"
                                         Style="{ThemeResource AccentButtonStyle}" Padding="16,6">
                                     <TextBlock Text="选择"/>
                                 </Button>
                                 <Button Command="{Binding Vm.DeleteCommand, ElementName=PageRoot}"
-                                        CommandParameter="{x:Bind}" ToolTip="删除"
+                                        CommandParameter="{x:Bind}"
+                                        ToolTipService.ToolTip="删除此节点"
                                         Padding="8,6">
                                     <FontIcon Glyph="&#xE74D;" FontSize="14"/>
                                 </Button>

@@ -15,18 +15,8 @@
                         <!-- 状态行 -->
                         <Grid>
                             <StackPanel Orientation="Horizontal" Spacing="12">
-                                <Ellipse Width="12" Height="12" Margin="2,6,0,0">
-                                    <Ellipse.Style>
-                                        <Style TargetType="Ellipse">
-                                            <Setter Property="Fill" Value="{ThemeResource SystemFillColorNeutralBrush}"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{x:Bind Vm.IsConnected, Mode=OneWay}" Value="True">
-                                                    <Setter Property="Fill" Value="{ThemeResource SystemFillColorSuccessBrush}"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Ellipse.Style>
-                                </Ellipse>
+                                <Ellipse Width="12" Height="12" Margin="2,6,0,0"
+                                         Fill="{x:Bind Vm.IsConnected, Mode=OneWay, Converter={StaticResource BoolToConnBrush}}"/>
                                 <TextBlock Text="{x:Bind Vm.StateText, Mode=OneWay}" FontSize="22" FontWeight="SemiBold"/>
                                 <ProgressRing IsActive="{x:Bind Vm.Busy, Mode=OneWay}"
                                               Width="20" Height="20" VerticalAlignment="Center"/>
