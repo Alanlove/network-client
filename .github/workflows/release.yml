@@ -122,47 +122,47 @@ jobs:
         }
 
         # makepri 兜底生成 resources.pri（如果 MSBuild 没生成的话）
-        $priPath = Join-Path $client "resources.pri"
-        if (-not (Test-Path $priPath)) {
-          Write-Host "=== Generating resources.pri with makepri ==="
-          # 选 x64 版本（路径里有 x64 的）
-          $makePri = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makepri.exe" -ErrorAction SilentlyContinue |
-            Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
-          if (-not $makePri) {
+        # 注意：用 try/catch + exit code reset 确保 makepri 失败不会 crash step
+        try {
+          $priPath = Join-Path $client "resources.pri"
+          if (-not (Test-Path $priPath)) {
+            Write-Host "=== Generating resources.pri with makepri ==="
             $makePri = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makepri.exe" -ErrorAction SilentlyContinue |
-              Sort-Object FullName -Descending | Select-Object -First 1
-          }
-          if ($makePri) {
-            Write-Host "  Using: $($makePri.FullName)"
-            $projDir = "$env:ROOT\client\WindowsClient"
-            $priConfig = Join-Path $client "priconfig.xml"
-            # 先生成默认配置（omit <packaging> 节，unpackaged app 需要）
-            & $makePri.FullName createconfig /cf $priConfig /default en-US /overwrite 2>&1 | Out-Host
-            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $priConfig)) {
-              Write-Host "  createconfig failed, trying without /default"
-              & $makePri.FullName createconfig /cf $priConfig /overwrite 2>&1 | Out-Host
+              Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
+            if (-not $makePri) {
+              $makePri = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makepri.exe" -ErrorAction SilentlyContinue |
+                Sort-Object FullName -Descending | Select-Object -First 1
             }
-            if (Test-Path $priConfig) {
-              # 删除 <packaging> 节（unpackaged app 不需要）
-              $xml = [xml](Get-Content $priConfig)
-              if ($xml.root.packaging) { $xml.root.RemoveChild($xml.root.packaging) | Out-Null }
-              $xml.Save($priConfig)
-              Write-Host "  Config ready, generating PRI..."
-              & $makePri.FullName new /pr $projDir /cf $priConfig "/of=$priPath" /overwrite 2>&1 | Out-Host
-              if (Test-Path $priPath) {
-                Write-Host "  Generated resources.pri ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
+            if ($makePri) {
+              Write-Host "  Using: $($makePri.FullName)"
+              $projDir = "$env:ROOT\client\WindowsClient"
+              $priConfig = Join-Path $client "priconfig.xml"
+              $null = & $makePri.FullName createconfig /cf $priConfig /default en-US /overwrite 2>&1
+              if (Test-Path $priConfig) {
+                $xml = [xml](Get-Content $priConfig)
+                if ($xml.root.packaging) { $xml.root.RemoveChild($xml.root.packaging) | Out-Null }
+                $xml.Save($priConfig)
+                Write-Host "  Config created, generating PRI..."
+                $null = & $makePri.FullName new /pr $projDir /cf $priConfig "/of=$priPath" /overwrite 2>&1
+                if (Test-Path $priPath) {
+                  Write-Host "  Generated resources.pri ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
+                } else {
+                  Write-Host "  makepri new failed — PRI missing (XAML navigation may fail)"
+                }
               } else {
-                Write-Host "  makepri new also failed — PRI will be missing"
+                Write-Host "  createconfig failed — skipping PRI"
               }
             } else {
-              Write-Host "  Could not create config — skipping PRI generation"
+              Write-Host "  makepri.exe not found — skipping PRI"
             }
           } else {
-            Write-Host "  makepri.exe not found — skipping PRI generation"
+            Write-Host "resources.pri already exists ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
           }
-        } else {
-          Write-Host "resources.pri already exists ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
+        } catch {
+          Write-Host "  makepri block error: $_"
         }
+        # 关键：重置 $LASTEXITCODE，防止外部命令 exit code crash step
+        $LASTEXITCODE = 0
 
         Copy-Item "$env:ROOT\service\network-service\target\release\network-service.exe" "$pkg\bin\" -Force
         Copy-Item "$client\*" "$pkg\" -Recurse -Force
