@@ -14,7 +14,8 @@ public static class Program
 {
     private static readonly string LogPath =
         System.IO.Path.Combine(
-            AppContext.BaseDirectory, "client-startup.log");
+            System.Environment.GetFolderPath(System.Environment.SpecialFolder.LocalApplicationData),
+            "NetworkClient", "logs", "client-startup.log");
 
     [STAThread]
     public static void Main(string[] args)

@@ -70,10 +70,14 @@ public sealed class ServiceHost : IDisposable
 
     private void TryLaunchService()
     {
-        // Dev override first, then per-user install dir.
+        // Search order:
+        // 1. Dev override via NC_SERVICE_EXE env var
+        // 2. Installed side-by-side: {app}\bin\network-service.exe
+        // 3. Legacy per-user fallback
         var candidates = new[]
         {
             Environment.GetEnvironmentVariable("NC_SERVICE_EXE"),
+            Path.Combine(AppContext.BaseDirectory, "bin", "network-service.exe"),
             Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "NetworkClient", "bin", "network-service.exe"),

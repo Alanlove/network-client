@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -9,11 +9,15 @@
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
+    <!-- MSIX packaging disabled (we use Inno Setup / zip instead) -->
     <EnableMsixTooling>false</EnableMsixTooling>
-    <EnableCoreMrtTooling>false</EnableCoreMrtTooling>
-    <AppxGeneratePriEnabled>false</AppxGeneratePriEnabled>
     <WindowsPackageType>None</WindowsPackageType>
     <AppxPackage>false</AppxPackage>
+    <!-- BUT CoreMRT + PRI MUST stay enabled — they produce .xbf / .pri
+         which InitializeComponent() needs at runtime. Disabling these
+         causes "XAML parsing failed" (0x802B000A) on launch. -->
+    <EnableCoreMrtTooling>true</EnableCoreMrtTooling>
+    <AppxGeneratePriEnabled>true</AppxGeneratePriEnabled>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
