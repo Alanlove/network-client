@@ -66,15 +66,15 @@ jobs:
       shell: pwsh
       run: |
         $publishDir = "$env:ROOT\artifacts\client\"
+        # EnableMsixTooling=true in csproj ensures .xbf + .pri are generated.
+        # MSBuild Publish copies .pri automatically (via MSIX task), but .xbf
+        # stays in obj/ — we copy those in the Assemble step below.
         msbuild "${env:ROOT}\client\WindowsClient\WindowsClient.csproj" `
           /t:Publish /p:Configuration=Release /p:Platform=x64 `
           /p:RuntimeIdentifier=win-x64 /p:SelfContained=true `
           "/p:PublishDir=$publishDir" /p:PublishSingleFile=false `
-          /p:GeneratePriFile=true `
-          "/p:PriOutputPath=$publishDir\resources.pri" `
-          "/p:AppxPackageDir=$publishDir" `
           /v:minimal
-        Write-Host "--- artifacts/client contents ---"
+        Write-Host "--- artifacts/client (key files) ---"
         Get-ChildItem $publishDir | Where-Object { $_.Extension -match 'xbf|pri|resources|dll|exe' } |
           ForEach-Object { "  $([math]::Round($_.Length/1KB,1)) KB  $($_.Name)" }
 
@@ -107,62 +107,19 @@ jobs:
           $_.Name -match '\.xbf$|\.pri$|\.resources$|WindowsClient\.dll$|WindowsClient\.exe$'
         } | ForEach-Object { "  $([math]::Round($_.Length/1KB,1)) KB  $($_.FullName.Replace($client, ''))" }
 
-        # Copy XAML compiled outputs from obj (MSBuild Publish doesn't copy these!)
-        # .xbf  = XAML binary format (required for InitializeComponent & Navigate)
-        # .pri  = Package Resource Index (required for ms-appx:/// resource lookup)
-        # PowerShell -Include 必须配合 -Recurse 才能生效
-        Write-Host "=== Scanning obj for XAML artifacts ==="
+        # Copy XAML compiled outputs from obj (MSBuild Publish doesn't copy .xbf!)
+        # EnableMsixTooling=true already produces .pri in PublishDir, but .xbf stays in obj/
+        # so we copy both to be safe. This ensures InitializeComponent() and Navigate() work.
+        Write-Host "=== Copying XAML artifacts from obj ==="
         $xamlFiles = Get-ChildItem "$env:ROOT\client\WindowsClient\obj" -Recurse -File -ErrorAction SilentlyContinue |
-          Where-Object { $_.Extension -in '.xbf','.pri','.resources' }
-        Write-Host "  Found: $($xamlFiles.Count) files"
+          Where-Object { $_.Extension -in '.xbf','.pri','.resources' } |
+          Group-Object Name | ForEach-Object { $_.Group | Select-Object -First 1 }
+        Write-Host "  Found $($xamlFiles.Count) unique files"
         foreach ($f in $xamlFiles) {
           $dest = Join-Path $client $f.Name
           Copy-Item $f.FullName $dest -Force
-          Write-Host "  Copied $($f.Name) ($([math]::Round($f.Length/1KB,1)) KB) <- $($f.Directory.Name)"
+          Write-Host "  Copied $($f.Name) ($([math]::Round($f.Length/1KB,1)) KB)"
         }
-
-        # makepri 兜底生成 resources.pri（如果 MSBuild 没生成的话）
-        # 注意：用 try/catch + exit code reset 确保 makepri 失败不会 crash step
-        try {
-          $priPath = Join-Path $client "resources.pri"
-          if (-not (Test-Path $priPath)) {
-            Write-Host "=== Generating resources.pri with makepri ==="
-            $makePri = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makepri.exe" -ErrorAction SilentlyContinue |
-              Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
-            if (-not $makePri) {
-              $makePri = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makepri.exe" -ErrorAction SilentlyContinue |
-                Sort-Object FullName -Descending | Select-Object -First 1
-            }
-            if ($makePri) {
-              Write-Host "  Using: $($makePri.FullName)"
-              $projDir = "$env:ROOT\client\WindowsClient"
-              $priConfig = Join-Path $client "priconfig.xml"
-              $null = & $makePri.FullName createconfig /cf $priConfig /default en-US /overwrite 2>&1
-              if (Test-Path $priConfig) {
-                $xml = [xml](Get-Content $priConfig)
-                if ($xml.root.packaging) { $xml.root.RemoveChild($xml.root.packaging) | Out-Null }
-                $xml.Save($priConfig)
-                Write-Host "  Config created, generating PRI..."
-                $null = & $makePri.FullName new /pr $projDir /cf $priConfig "/of=$priPath" /overwrite 2>&1
-                if (Test-Path $priPath) {
-                  Write-Host "  Generated resources.pri ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
-                } else {
-                  Write-Host "  makepri new failed — PRI missing (XAML navigation may fail)"
-                }
-              } else {
-                Write-Host "  createconfig failed — skipping PRI"
-              }
-            } else {
-              Write-Host "  makepri.exe not found — skipping PRI"
-            }
-          } else {
-            Write-Host "resources.pri already exists ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
-          }
-        } catch {
-          Write-Host "  makepri block error: $_"
-        }
-        # 关键：重置 $LASTEXITCODE，防止外部命令 exit code crash step
-        $LASTEXITCODE = 0
 
         Copy-Item "$env:ROOT\service\network-service\target\release\network-service.exe" "$pkg\bin\" -Force
         Copy-Item "$client\*" "$pkg\" -Recurse -Force
