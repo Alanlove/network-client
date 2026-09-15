@@ -32,3 +32,6 @@ desktop.ini
 
 # ========== Rust ==========
 service/network-service/Cargo.lock
+
+# Build artifacts
+artifacts/
