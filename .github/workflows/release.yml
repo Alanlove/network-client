@@ -41,14 +41,19 @@ jobs:
     - name: Install Inno Setup
       shell: pwsh
       run: |
-        choco install innosetup -y --no-progress 2>&1 | Select-Object -Last 5
-        # 确保 ISCC.exe 在 PATH 中
+        # windows-2022 runners already have Inno Setup pre-installed.
+        # Verify ISCC.exe exists; install only if missing.
+        $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
+        if (-not $iscc) {
+          Write-Host "ISCC not found, installing via chocolatey..."
+          choco install innosetup -y --no-progress 2>&1 | Select-Object -Last 3
+        }
         $iscc = Get-ChildItem "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" -ErrorAction SilentlyContinue
         if ($iscc) {
-          Write-Host "Inno Setup found: $($iscc.FullName)"
-          Write-Host "##[add-path]C:\Program Files (x86)\Inno Setup 6"
+          Write-Host "ISCC ready: $($iscc.FullName)"
         } else {
-          Write-Host "WARN: ISCC.exe not found after chocolatey install"
+          Write-Host "ERROR: ISCC.exe not found after install attempt"
+          exit 1
         }
 
     - name: Restore .NET dependencies
