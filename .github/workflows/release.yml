@@ -70,9 +70,13 @@ jobs:
           /t:Publish /p:Configuration=Release /p:Platform=x64 `
           /p:RuntimeIdentifier=win-x64 /p:SelfContained=true `
           "/p:PublishDir=$publishDir" /p:PublishSingleFile=false `
+          /p:GeneratePriFile=true `
+          "/p:PriOutputPath=$publishDir\resources.pri" `
+          "/p:AppxPackageDir=$publishDir" `
           /v:minimal
         Write-Host "--- artifacts/client contents ---"
-        Get-ChildItem $publishDir | Select-Object Name, Length
+        Get-ChildItem $publishDir | Where-Object { $_.Extension -match 'xbf|pri|resources|dll|exe' } |
+          ForEach-Object { "  $([math]::Round($_.Length/1KB,1)) KB  $($_.Name)" }
 
     - name: Download Xray core
       shell: pwsh
@@ -115,6 +119,30 @@ jobs:
           $dest = Join-Path $client $f.Name
           Copy-Item $f.FullName $dest -Force
           Write-Host "  Copied $($f.Name) ($([math]::Round($f.Length/1KB,1)) KB) <- $($f.Directory.Name)"
+        }
+
+        # makepri 兜底生成 resources.pri（如果 MSBuild 没生成的话）
+        $priPath = Join-Path $client "resources.pri"
+        if (-not (Test-Path $priPath)) {
+          Write-Host "=== Generating resources.pri with makepri ==="
+          $makePri = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makepri.exe" -ErrorAction SilentlyContinue |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if ($makePri) {
+            Write-Host "  Using: $($makePri.FullName)"
+            # 在项目源码目录（有原始 XAML）运行 makepri
+            $projDir = "$env:ROOT\client\WindowsClient"
+            & $makePri.FullName new /pr $projDir /cf $null "/of=$priPath" 2>&1
+            if (Test-Path $priPath) {
+              Write-Host "  Generated resources.pri ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
+            } else {
+              Write-Host "  makepri failed, trying with default config"
+              & $makePri.FullName new /pr $projDir /mf "priconfig.xml" "/of=$priPath" 2>&1
+            }
+          } else {
+            Write-Host "  makepri.exe not found — skipping PRI generation"
+          }
+        } else {
+          Write-Host "resources.pri already exists ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
         }
 
         Copy-Item "$env:ROOT\service\network-service\target\release\network-service.exe" "$pkg\bin\" -Force
