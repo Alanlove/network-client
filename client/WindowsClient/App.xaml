@@ -9,6 +9,10 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls"/>
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- WinUI 3 NavigationView theme brushes not available in unpackaged
+                 mode — define them here so {ThemeResource ControlOnImageFillBrush} resolves. -->
+            <SolidColorBrush x:Key="ControlOnImageFillBrush" Color="#1AFFFFFF"/>
+
             <!-- WinAppSDK 1.6 does not ship CardBorderFilledStyle (added in
                  later control styles); define the same card look locally. -->
             <Style x:Key="CardBorderFilledStyle" TargetType="Border">
