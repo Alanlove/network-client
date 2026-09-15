@@ -125,18 +125,37 @@ jobs:
         $priPath = Join-Path $client "resources.pri"
         if (-not (Test-Path $priPath)) {
           Write-Host "=== Generating resources.pri with makepri ==="
+          # 选 x64 版本（路径里有 x64 的）
           $makePri = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makepri.exe" -ErrorAction SilentlyContinue |
-            Sort-Object FullName -Descending | Select-Object -First 1
+            Where-Object { $_.Directory.Name -eq 'x64' } | Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $makePri) {
+            $makePri = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "makepri.exe" -ErrorAction SilentlyContinue |
+              Sort-Object FullName -Descending | Select-Object -First 1
+          }
           if ($makePri) {
             Write-Host "  Using: $($makePri.FullName)"
-            # 在项目源码目录（有原始 XAML）运行 makepri
             $projDir = "$env:ROOT\client\WindowsClient"
-            & $makePri.FullName new /pr $projDir /cf $null "/of=$priPath" 2>&1
-            if (Test-Path $priPath) {
-              Write-Host "  Generated resources.pri ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
+            $priConfig = Join-Path $client "priconfig.xml"
+            # 先生成默认配置（omit <packaging> 节，unpackaged app 需要）
+            & $makePri.FullName createconfig /cf $priConfig /default en-US /overwrite 2>&1 | Out-Host
+            if ($LASTEXITCODE -ne 0 -or -not (Test-Path $priConfig)) {
+              Write-Host "  createconfig failed, trying without /default"
+              & $makePri.FullName createconfig /cf $priConfig /overwrite 2>&1 | Out-Host
+            }
+            if (Test-Path $priConfig) {
+              # 删除 <packaging> 节（unpackaged app 不需要）
+              $xml = [xml](Get-Content $priConfig)
+              if ($xml.root.packaging) { $xml.root.RemoveChild($xml.root.packaging) | Out-Null }
+              $xml.Save($priConfig)
+              Write-Host "  Config ready, generating PRI..."
+              & $makePri.FullName new /pr $projDir /cf $priConfig "/of=$priPath" /overwrite 2>&1 | Out-Host
+              if (Test-Path $priPath) {
+                Write-Host "  Generated resources.pri ($([math]::Round((Get-Item $priPath).Length/1KB,1)) KB)"
+              } else {
+                Write-Host "  makepri new also failed — PRI will be missing"
+              }
             } else {
-              Write-Host "  makepri failed, trying with default config"
-              & $makePri.FullName new /pr $projDir /mf "priconfig.xml" "/of=$priPath" 2>&1
+              Write-Host "  Could not create config — skipping PRI generation"
             }
           } else {
             Write-Host "  makepri.exe not found — skipping PRI generation"
