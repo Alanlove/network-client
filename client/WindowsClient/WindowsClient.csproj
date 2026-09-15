@@ -9,15 +9,18 @@
     <Platforms>x64;ARM64</Platforms>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <UseWinUI>true</UseWinUI>
-    <!-- MSIX packaging disabled (we use Inno Setup / zip instead) -->
-    <EnableMsixTooling>false</EnableMsixTooling>
-    <WindowsPackageType>None</WindowsPackageType>
-    <AppxPackage>false</AppxPackage>
-    <!-- BUT CoreMRT + PRI MUST stay enabled — they produce .xbf / .pri
-         which InitializeComponent() needs at runtime. Disabling these
-         causes "XAML parsing failed" (0x802B000A) on launch. -->
+    <!-- MSIX packaging disabled (we use Inno Setup / zip instead)
+         BUT EnableMsixTooling MUST be true — it produces both .xbf (XAML binary)
+         and .pri (Package Resource Index). Without these:
+           - No .xbf → InitializeComponent() fails (0x802B000A XamlParseException)
+           - No .pri  → Navigate(typeof(Page)) fails (ms-appx:/// resource not found)
+         WindowsPackageType=None means: MSIX toolchain runs, but no .msix/.appx is produced. -->
+    <EnableMsixTooling>true</EnableMsixTooling>
     <EnableCoreMrtTooling>true</EnableCoreMrtTooling>
     <AppxGeneratePriEnabled>true</AppxGeneratePriEnabled>
+    <WindowsPackageType>None</WindowsPackageType>
+    <AppxPackage>false</AppxPackage>
+    <GeneratePriFile>true</GeneratePriFile>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
