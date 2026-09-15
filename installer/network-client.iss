@@ -22,7 +22,7 @@ AppUpdatesURL={#AppURL}
 DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
-OutputDir=artifacts
+OutputDir=..\artifacts
 OutputBaseFilename=NetworkClient-Setup-{#AppVersion}-x64
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -40,8 +40,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
 
 [Files]
-; Source path relative to repo root (where ISCC is invoked from CI)
-Source: "artifacts\package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Source path relative to .iss file location (installer/), so ".." = repo root
+Source: "..\artifacts\package\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
