@@ -97,6 +97,22 @@ jobs:
         New-Item -ItemType Directory -Path "$pkg\logs" -Force | Out-Null
         New-Item -ItemType Directory -Path "$pkg\cache\geoip" -Force | Out-Null
 
+        # DIAGNOSTIC: list client dir contents (find .xbf/.pri)
+        Write-Host "=== Diagnostic: artifacts/client key files ==="
+        Get-ChildItem $client -Recurse -File | Where-Object {
+          $_.Name -match '\.xbf$|\.pri$|\.resources$|WindowsClient\.dll$|WindowsClient\.exe$'
+        } | ForEach-Object { "  $([math]::Round($_.Length/1KB,1)) KB  $($_.FullName.Replace($client, ''))" }
+
+        # Copy XAML compiled outputs (xbf, pri) explicitly if not auto-copied
+        $xbfFiles = Get-ChildItem "$env:ROOT\client\WindowsClient\obj" -Recurse -File -Include "*.xbf","*.pri" -ErrorAction SilentlyContinue
+        foreach ($f in $xbfFiles) {
+          $dest = Join-Path $client $f.Name
+          if (-not (Test-Path $dest)) {
+            Copy-Item $f.FullName $dest -Force
+            Write-Host "  Copied $($f.Name) -> $dest ($([math]::Round($f.Length/1KB,1)) KB)"
+          }
+        }
+
         Copy-Item "$env:ROOT\service\network-service\target\release\network-service.exe" "$pkg\bin\" -Force
         Copy-Item "$client\*" "$pkg\" -Recurse -Force
 
